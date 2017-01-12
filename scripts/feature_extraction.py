@@ -48,15 +48,6 @@ class Traceroute:
 
 
 """
-Get the index of the timeslot in <timeslotsLowerBounds> to which the route observed at time <timestamp> belongs to. A
-timeslot in the array <timeslotsLowerBounds> is represented with its lower bound.  For instance, the entry for the
-timeslot (0, 12) in the array is simply 0.
-"""
-def getTimeslotIndex(timeslotsLowerBounds, timestamp):
-    return bisect.bisect_left(timeslotsLowerBounds, timestamp)
-
-
-"""
 Get the unixtimestamp from the string <dateString> in the format YYYYMMDDThh:mm:ss
 YYYY = year
 MM   = month
@@ -84,6 +75,16 @@ def getUnixTimestamp(dateString):
 
     return unixts
 
+
+"""
+Get the index of the timeslot in <timeslotsLowerBounds> to which the route observed at time <timestamp> belongs to. A
+timeslot in the array <timeslotsLowerBounds> is represented with its lower bound.  For instance, the entry for the
+timeslot (0, 12) in the array is simply 0.
+"""
+def getTimeslotIndex(timeslotsLowerBounds, timestamp):
+    return bisect.bisect_left(timeslotsLowerBounds, timestamp)
+
+
 """
 Get the timeslots by which you want to separate your observation (learning) time. <timestamp> indicates the time (in
 the unix-timestamp format) at which the observation time starts, <timeslotDuration> the duration (in hours) of one
@@ -97,3 +98,44 @@ def getTimeslots(timestamp, timeslotDuration, observationDuration):
     timeslots = [tuple([timeslotBoundaries[i], timeslotBoundaries[i + 1]]) for i in
                  range(0, numberOfTimeslotsBoundaries - 1)]
     return timeslots
+
+
+"""
+Get statistics from the numpy array <numpyVec> containing either integers or floats. The statistics that are extracted are:
+average (avg), minimum (min), maximum (max), 5% -, 10% -, 25% -, 50% -, 75% -, 90% -, and 95% - percentile (perc).
+The collected stats are returned in an array of the form:
+[avg, min, max, 5perc, 10perc, 25perc, 50perc, 75perc, 90perc, 95perc].
+"""
+def getStatisticsVector(numpyVec):
+    average = np.mean(numpyVec)
+
+    # min route age
+    minimum = min(numpyVec)
+
+    # max route age
+    maximum = max(numpyVec)
+
+    # 5% percentile
+    perc5 = np.percentile(numpyVec, 5)
+
+    # 10% percentile
+    perc10 = np.percentile(numpyVec, 10)
+
+    # 25% percentile
+    perc25 = np.percentile(numpyVec, 25)
+
+    # 50% percentile
+    perc50 = np.percentile(numpyVec, 50)
+
+    # 75% percentile
+    perc75 = np.percentile(numpyVec, 75)
+
+    # 90% percentile
+    perc90 = np.percentile(numpyVec, 90)
+
+    # 95% percentile
+    perc95 = np.percentile(numpyVec, 95)
+
+    # vector containing computed statistics
+    return [str(average), str(minimum), str(maximum), str(perc5), str(perc10), str(perc25), str(perc50),
+            str(perc75), str(perc90), str(perc95)]

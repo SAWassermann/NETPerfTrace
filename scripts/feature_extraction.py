@@ -1,9 +1,13 @@
 import datetime, time, bisect, math, numpy as np
 
+
 """
-Class representing a traceroute hop
+Class representing a traceroute hop.
 """
 class TracerouteHop:
+    """
+    Initiate a Hop instance
+    """
     def __init__(self):
         self.IP = ''
 
@@ -12,16 +16,28 @@ class TracerouteHop:
         self.maxRTT = '-1'
         self.mdevRTT = '-1'
 
+
+    """
+    Tow Hop instances are considered as being equal if their IP addresses are the same.
+    """
     def __eq__(self, other):
         return self.IP == other.IP
 
+
+    """
+    Tow Hop instances are considered as being unequal if their IP addresses are different.
+    """
     def __ne__(self, other):
         return self.IP != other.IP
 
+
 """
-Class representing a complete traceroute
+Class representing a complete traceroute.
 """
 class Traceroute:
+    """
+    Initiate a Traceroute instance
+    """
     def __init__(self):
         self.hops = list()
 
@@ -30,7 +46,7 @@ class Traceroute:
         self.resLife = '-1'
 
         self.timestamp = '-1'
-        self.timeSlotIndex = 0
+        self.timeslotIndex = 0
 
         self.lastHop = TracerouteHop()
         self.nextHop = TracerouteHop()
@@ -40,9 +56,20 @@ class Traceroute:
 
         self.nbRouteChangesInNextSlot = '-1'
 
+        self.srcIP = ''
+        self.dstIP = ''
+
+
+    """
+    Two Traceroute instances are considered as being equal if their lists of hops are the identical.
+    """
     def __eq__(self, other):
         return self.hops == other.hops
 
+
+    """
+    Two Traceroute instances are considered as being unequal if their lists of hops are different.
+    """
     def __ne__(self, other):
         return self.hops != other.hops
 
@@ -139,3 +166,89 @@ def getStatisticsVector(numpyVec):
     # vector containing computed statistics
     return [str(average), str(minimum), str(maximum), str(perc5), str(perc10), str(perc25), str(perc50),
             str(perc75), str(perc90), str(perc95)]
+
+
+def getFeatures(filename, observationDuration, timeslotDuration):
+    with open(filename, 'r') as inputFile:
+        diffTraceroutes = list()  # observed traceroutes without sequential repetition; example: A A B A is stored as A B A)
+        traceroutes     = list()  # all obsserved traceroutes
+
+        timestampMeasurementsBegin = ''  # timestamp indicating the time at which the first traceroute was observed
+        timestampMeasurementsEnd   = ''  # timestamp indicating the time at which the last traceroute was observed
+
+        currentTraceroute = Traceroute()
+
+        # each index corresponds to a timeslotIndex which points to a list of traceroutes corresponding to that timeslot
+        # same traceroute-storing principle as for <difftraceroutes>
+        routesInSlots = list()
+
+        for line in inputFile:
+            line = line.rstrip('\r\n')
+            if line:
+                data = line.split('\t')  # lines must be tab-separated
+
+                # get source of traceroute
+                if data[0] == 'SOURCE:':
+                    currentTraceroute.srcIP = data[1]
+
+                # get destination of traceroute
+                elif data[0] == 'DESTINATION:':
+                    currentTraceroute.dstIP = data[1]
+
+                # get timestamp for time at which this traceroute was launched
+                elif data[0] == 'TIMESTAMP:':
+                    unixTimestamp = getUnixTimestamp(data[1])
+
+                    if not timestampMeasurementsBegin:   # first traceroute in file
+                        # prepare the different timeslots: each traceroute sample will be assigned to its corresponding
+                        # timeslot so that we can compute the number of route changes in each slot later
+                        timeslots = getTimeslots(unixTimestamp, timeslotDuration, observationDuration)
+                        timeslotsLowerBounds = [ts[0] for ts in timeslots]  # get lower bounds of different timeslots
+
+                        # initiate the list for each timeslot (the lists will later contain the traceroutes associated to
+                        # the different timeslots
+                        for i in range(1, len(timeslots) + 1):
+                            routesInSlots.append(list())
+
+                    currentTraceroute.timestamp = unixTimestamp
+                    timestampMeasurementsEnd = unixTimestamp
+
+                # get information about one traceroute hop
+                elif data[0] == 'HOP:':
+                    hop = TracerouteHop()
+                    hop.IP = data[1]
+                    hop.minRTT = data[2]
+                    hop.avgRTT = data[3]
+                    hop.maxRTT = data[4]
+                    hop.mdevRTT = data[5]
+
+                    currentTraceroute.hops.append(hop)
+
+                    # if we obtained a responde (i.e. we have the corresponding IP and the minimum RTT), consider this
+                    # hop as the last traceroute hop
+                    if hop.minRTT != '-1' and hop.IP != 'NA':
+                        currentTraceroute.lastHop = hop
+
+                # all information about one traceroute has been collected - wrap up with this one
+                elif data[0] == 'END':
+                    # add this traceroute to its corresponding timeslot
+                    timeslotIndex = getTimeslotIndex(timeslotsLowerBounds, currentTraceroute.timestamp)
+                    currentTraceroute.timeslotIndex = timeslotIndex
+
+                    # if applicable, add this traceroute to the list of different traceroutes
+                    if len(diffTraceroutes) == 0 or currentTraceroute != diffTraceroutes[-1]:
+                        diffTraceroutes.append(currentTraceroute)
+
+                    # if applicable, add this traceroute to the list of traceroutes of its corresponding timeslot
+                    if len(routesInSlots[currentTraceroute.timeslotIndex]) == 0 \
+                        or currentTraceroute != routesInSlots[currentTraceroute.timeslotIndex][-1]:
+                        routesInSlots[currentTraceroute.timeslotIndex].append(currentTraceroute)
+
+                    # record for this traceroute the number of route changes so far observed in its timeslot
+                    currentTraceroute.currentNbChangesInSlot = len(routesInSlots[currentTraceroute.timeslotIndex]) - 1
+
+                    # save this traceroute sample
+                    traceroutes.append(currentTraceroute)
+
+                    # prepare for next measurement/traceroute
+                    currentTraceroute = Traceroute()

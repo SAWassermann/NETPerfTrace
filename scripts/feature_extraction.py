@@ -42,14 +42,13 @@ class Traceroute:
         self.hops = list()
 
         self.routeAge = '0'
-        self.routeDuration = '0'
         self.resLife = '-1'
 
         self.timestamp = '-1'
         self.timeslotIndex = 0
 
-        self.lastHop = TracerouteHop()
-        self.nextHop = TracerouteHop()
+        self.lastHop = TracerouteHop()      # last hop of traceroute
+        self.nextLastHop = TracerouteHop()  # last hop of the next traceroute sample
 
         self.currentNbChangesInSlot = 0
         self.nbRouteChangesInSlot = '-1'
@@ -130,42 +129,47 @@ def getTimeslots(timestamp, timeslotDuration, observationDuration):
 """
 Get statistics from the numpy array <numpyVec> containing either integers or floats. The statistics that are extracted are:
 average (avg), minimum (min), maximum (max), 5% -, 10% -, 25% -, 50% -, 75% -, 90% -, and 95% - percentile (perc).
-The collected stats are returned in an array of the form:
+The collected stats are returned as strings in an array of the form:
 [avg, min, max, 5perc, 10perc, 25perc, 50perc, 75perc, 90perc, 95perc].
+If <numpyVec> is empty, return an array filled with 0's (length = 10).
 """
 def getStatisticsVector(numpyVec):
-    average = np.mean(numpyVec)
+    NUMBER_OF_STATS = 10
+    if len(numpyVec):
+        average = np.mean(numpyVec)
 
-    # min route age
-    minimum = min(numpyVec)
+        # min route age
+        minimum = min(numpyVec)
 
-    # max route age
-    maximum = max(numpyVec)
+        # max route age
+        maximum = max(numpyVec)
 
-    # 5% percentile
-    perc5 = np.percentile(numpyVec, 5)
+        # 5% percentile
+        perc5 = np.percentile(numpyVec, 5)
 
-    # 10% percentile
-    perc10 = np.percentile(numpyVec, 10)
+        # 10% percentile
+        perc10 = np.percentile(numpyVec, 10)
 
-    # 25% percentile
-    perc25 = np.percentile(numpyVec, 25)
+        # 25% percentile
+        perc25 = np.percentile(numpyVec, 25)
 
-    # 50% percentile
-    perc50 = np.percentile(numpyVec, 50)
+        # 50% percentile
+        perc50 = np.percentile(numpyVec, 50)
 
-    # 75% percentile
-    perc75 = np.percentile(numpyVec, 75)
+        # 75% percentile
+        perc75 = np.percentile(numpyVec, 75)
 
-    # 90% percentile
-    perc90 = np.percentile(numpyVec, 90)
+        # 90% percentile
+        perc90 = np.percentile(numpyVec, 90)
 
-    # 95% percentile
-    perc95 = np.percentile(numpyVec, 95)
+        # 95% percentile
+        perc95 = np.percentile(numpyVec, 95)
 
-    # vector containing computed statistics
-    return [str(average), str(minimum), str(maximum), str(perc5), str(perc10), str(perc25), str(perc50),
-            str(perc75), str(perc90), str(perc95)]
+        # vector containing computed statistics
+        return [str(average), str(minimum), str(maximum), str(perc5), str(perc10), str(perc25), str(perc50),
+                str(perc75), str(perc90), str(perc95)]
+    else:
+        return ['0' for i in range(0, NUMBER_OF_STATS)]
 
 
 def getFeatures(filename, observationDuration, timeslotDuration):
@@ -174,7 +178,6 @@ def getFeatures(filename, observationDuration, timeslotDuration):
         traceroutes     = list()  # all obsserved traceroutes
 
         timestampMeasurementsBegin = ''  # timestamp indicating the time at which the first traceroute was observed
-        timestampMeasurementsEnd   = ''  # timestamp indicating the time at which the last traceroute was observed
 
         currentTraceroute = Traceroute()
 
@@ -211,7 +214,6 @@ def getFeatures(filename, observationDuration, timeslotDuration):
                             routesInSlots.append(list())
 
                     currentTraceroute.timestamp = unixTimestamp
-                    timestampMeasurementsEnd = unixTimestamp
 
                 # get information about one traceroute hop
                 elif data[0] == 'HOP:':
@@ -252,3 +254,67 @@ def getFeatures(filename, observationDuration, timeslotDuration):
 
                     # prepare for next measurement/traceroute
                     currentTraceroute = Traceroute()
+
+        lengthTraceroutes        = len(traceroutes)
+        lengthDiffTraceroutes    = len(diffTraceroutes)
+
+        # number of route changes in total we observed for this path
+        nbRouteChanges = lengthDiffTraceroutes - 1 if lengthDiffTraceroutes > 0 else 0
+
+        # compute the route duration of the different routes
+        currentIndexDiffTraceroutes = 0  # value of index variable when running through <diffTraceroutes>
+        routeDurations = list()
+
+        for tracert in diffTraceroutes:
+            if currentIndexDiffTraceroutes < lengthDiffTraceroutes - 1:
+                routeDurations.append(float(diffTraceroutes[currentIndexDiffTraceroutes + 1].timestamp) - float(tracert.timestamp))
+            currentIndexDiffTraceroutes += 1
+
+        # compute route age and residual life for each sample + gather information about end-to-end delays
+        currentIndexDiffTraceroutes = 0
+        currentIndexTraceroutes     = 0  # value of index variable when running through <traceroutes>
+
+        minRTTs  = list()
+        avgRTTs  = list()
+        maxRTTs  = list()
+        mdevRTTs = list()
+
+        for tracert in traceroutes:
+            if currentIndexDiffTraceroutes < lengthDiffTraceroutes - 1:
+                tracert.resLife = float(diffTraceroutes[currentIndexDiffTraceroutes + 1].timestamp) - float(tracert.timestamp)
+            tracert.routeAge = float(tracert.timestamp) - float(diffTraceroutes[currentIndexDiffTraceroutes])
+
+            # does the next traceroute represent the same route as the current traceroute?
+            if currentIndexTraceroutes < lengthTraceroutes and traceroutes[currentIndexTraceroutes] != traceroutes[currentIndexTraceroutes + 1]:
+                currentIndexDiffTraceroutes += 1  # move on to the next traceroute in <diffTraceroutes>
+
+            if tracert.lastHop.minRTT != '-1':
+                minRTTs.append(float(tracert.lastHop.minRTT))
+                avgRTTs.append(float(tracert.lastHop.avgRTT))
+                maxRTTs.append(float(tracert.lastHop.maxRTT))
+                mdevRTTs.append(float(tracert.lastHop.mdevRTT))
+
+            # save the hop of the next traceroute sample to the current traceroute will be used for feature computation later)
+            if currentIndexTraceroutes < lengthTraceroutes - 1:
+                tracert.nextLastHop = traceroutes[currentIndexTraceroutes + 1].lastHop
+            else:
+                tracert.nextLastHop = tracert.lastHop
+
+            currentIndexTraceroutes += 1
+
+        # compute stats about observed route durations
+        routeDurations_np = np.array(routeDurations)  # create numpy array
+        routeDurationVector = getStatisticsVector(routeDurations_np)
+
+        # compute stats about route changes in timeslots
+        nbRouteChangesInTimeslots = [len(routes) - 1 if len(routes) > 0 else 0 for routes in routesInSlots]
+        nbRouteChangesInTimeslots_np = np.array(nbRouteChangesInTimeslots)
+        nbRouteChangesInTimeslotsVector = getStatisticsVector(nbRouteChangesInTimeslots_np)
+
+        # compute stats about observed average RTTs
+        avgRTTs_np = np.array(avgRTTs)  # create numpy array
+        avgRTTVector = getStatisticsVector(avgRTTs_np)
+
+        # compute stats about observed minimum RTTs
+        minRTTs_np = np.array(minRTTs)  # create numpy array
+        minRTTVector = getStatisticsVector(minRTTs_np)

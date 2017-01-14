@@ -41,22 +41,21 @@ class Traceroute:
     def __init__(self):
         self.hops = list()
 
-        self.routeAge = '0'
-        self.resLife = '-1'
+        self.routeAge = 0
+        self.resLife = -1
 
-        self.timestamp = '-1'
+        self.timestamp = None
         self.timeslotIndex = 0
 
         self.lastHop = TracerouteHop()      # last hop of traceroute
         self.nextLastHop = TracerouteHop()  # last hop of the next traceroute sample
 
-        self.currentNbChangesInSlot = 0
-        self.nbRouteChangesInSlot = '-1'
+        self.currentNbChangesInSlot = None
+        self.nbRouteChangesInSlot = 0
+        self.nbRouteChangesInNextSlot = -1
 
-        self.nbRouteChangesInNextSlot = '-1'
-
-        self.srcIP = ''
-        self.dstIP = ''
+        self.srcIP = None
+        self.dstIP = None
 
 
     """
@@ -83,23 +82,8 @@ mm   = minute
 ss   = second
 """
 def getUnixTimestamp(dateString):
-    ts = dateString.split('T')
-
-    dayInfo = ts[0]
-    hourInfo = ts[1]
-    hourInfo = hourInfo.split(':')
-
-    year = int(dayInfo[0:4])
-    month = int(dayInfo[4:6])
-    day = int(dayInfo[6:8])
-    hour = int(hourInfo[0])
-    minute = int(hourInfo[1])
-    second = int(hourInfo[2])
-
-    tracerouteTime = datetime.datetime(year, month, day, hour, minute, second)
-    unixts = time.mktime(tracerouteTime.timetuple())
-
-    return unixts
+    tracerouteTime = datetime.datetime.strptime(dateString, '%Y%m%dT%H:%M:%S')
+    return time.mktime(tracerouteTime.timetuple())
 
 
 """
@@ -136,38 +120,20 @@ If <numpyVec> is empty, return an array filled with 0's (length = 10).
 def getStatisticsVector(numpyVec):
     NUMBER_OF_STATS = 10
     if len(numpyVec):
+        # average
         average = np.mean(numpyVec)
 
-        # min route age
+        # min
         minimum = min(numpyVec)
 
-        # max route age
+        # max
         maximum = max(numpyVec)
 
-        # 5% percentile
-        perc5 = np.percentile(numpyVec, 5)
-
-        # 10% percentile
-        perc10 = np.percentile(numpyVec, 10)
-
-        # 25% percentile
-        perc25 = np.percentile(numpyVec, 25)
-
-        # 50% percentile
-        perc50 = np.percentile(numpyVec, 50)
-
-        # 75% percentile
-        perc75 = np.percentile(numpyVec, 75)
-
-        # 90% percentile
-        perc90 = np.percentile(numpyVec, 90)
-
-        # 95% percentile
-        perc95 = np.percentile(numpyVec, 95)
+        # 5% -, 10% -, 25% -, 50% -, 75% -, 90% -, and 95% - percentile
+        percentiles = np.percentile(numpyVec, [5, 10, 25, 50, 75, 90, 95])
 
         # vector containing computed statistics
-        return [str(average), str(minimum), str(maximum), str(perc5), str(perc10), str(perc25), str(perc50),
-                str(perc75), str(perc90), str(perc95)]
+        return [str(average), str(minimum), str(maximum)] + map(str, percentiles)
     else:
         return ['0' for i in range(0, NUMBER_OF_STATS)]
 
@@ -177,7 +143,7 @@ def getFeatures(filename, observationDuration, timeslotDuration):
         diffTraceroutes = list()  # observed traceroutes without sequential repetition; example: A A B A is stored as A B A)
         traceroutes     = list()  # all obsserved traceroutes
 
-        timestampMeasurementsBegin = ''  # timestamp indicating the time at which the first traceroute was observed
+        timestampMeasurementsBegin = None  # timestamp indicating the time at which the first traceroute was observed
 
         currentTraceroute = Traceroute()
 
@@ -247,7 +213,8 @@ def getFeatures(filename, observationDuration, timeslotDuration):
                         routesInSlots[currentTraceroute.timeslotIndex].append(currentTraceroute)
 
                     # record for this traceroute the number of route changes so far observed in its timeslot
-                    currentTraceroute.currentNbChangesInSlot = len(routesInSlots[currentTraceroute.timeslotIndex]) - 1
+                    currentTraceroute.currentNbChangesInSlot = len(routesInSlots[currentTraceroute.timeslotIndex]) - 1 \
+                                                            if len(routesInSlots[currentTraceroute.timeslotIndex]) - 1 else 0
 
                     # save this traceroute sample
                     traceroutes.append(currentTraceroute)

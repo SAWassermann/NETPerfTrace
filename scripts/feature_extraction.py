@@ -51,7 +51,7 @@ class Traceroute:
         self.nextLastHop = TracerouteHop()  # last hop of the next traceroute sample
 
         self.currentNbChangesInSlot = None
-        self.nbRouteChangesInSlot = 0
+        self.nbRouteChangesInSlot = -1
         self.nbRouteChangesInNextSlot = -1
 
         self.srcIP = None
@@ -163,7 +163,7 @@ hh   = hour
 mm   = minute
 ss   = second
 """
-def getUnixTimestamp(dateString):
+def __getUnixTimestamp(dateString):
     tracerouteTime = datetime.datetime.strptime(dateString, '%Y%m%dT%H:%M:%S')
     return time.mktime(tracerouteTime.timetuple())
 
@@ -173,19 +173,19 @@ Get the index of the timeslot in <timeslotsLowerBounds> to which the route obser
 timeslot in the array <timeslotsLowerBounds> is represented with its lower bound.  For instance, the entry for the
 timeslot (0, 12) in the array is simply 0.
 """
-def getTimeslotIndex(timeslotsLowerBounds, timestamp):
-    return bisect.bisect_left(timeslotsLowerBounds, timestamp)
+def __getTimeslotIndex(timeslotsLowerBounds, timestamp):
+    return bisect.bisect_right(timeslotsLowerBounds, timestamp) - 1
 
 
 """
-Get the timeslots by which you want to separate your observation (learning) time. <timestamp> indicates the time (in
+Get the timeslots by which you want to separate your observation (learning) time (in hours). <timestamp> indicates the time (in
 the unix-timestamp format) at which the observation time starts, <timeslotDuration> the duration (in hours) of one
 timeslot, and <observationDuration> represents the duration of the observation time.
 The timeslots are returned in the form of an array; each timeslot is represented by a tuple (<lb>, <ub>). <lb> is the lower
 bound of this timeslot and <ub> is the upper bound.
 """
-def getTimeslots(timestamp, timeslotDuration, observationDuration):
-    numberOfTimeslotsBoundaries = math.ceil(observationDuration / timeslotDuration) + 1
+def __getTimeslots(timestamp, timeslotDuration, observationDuration):
+    numberOfTimeslotsBoundaries = int(math.ceil(observationDuration / timeslotDuration) + 1)
     timeslotBoundaries = [timestamp + i * 60 * 60 * timeslotDuration for i in range(0, numberOfTimeslotsBoundaries)]
     timeslots = [tuple([timeslotBoundaries[i], timeslotBoundaries[i + 1]]) for i in
                  range(0, numberOfTimeslotsBoundaries - 1)]
@@ -203,7 +203,7 @@ elif metric == 'rtt' -> MininumRTTStatistics
 else None.
 If <numpyVec> is empty, return an instance for which the fields are filled with 0's.
 """
-def getStatistics(numpyVec, metric):
+def __getStatistics(numpyVec, metric):
     NUMBER_OF_PERCENTILES = 7
     if len(numpyVec):
         # average
@@ -241,7 +241,7 @@ form of a string.
 The format of the string is str(``routeDuration``) <tab> route age of the route <tab> residual lifetime of the route
 str(``routeDuration``) refers to the string representation of a ``NumberOfRouteChangesStatistics`` instance.
 """
-def collectResidualLifetimeFeatures(traceroute, routeDuration):
+def __collectResidualLifetimeFeatures(traceroute, routeDuration):
     return str(routeDuration) + '\t' + str(traceroute.routeAge) + '\t' + str(traceroute.resLifetime)
 
 
@@ -253,7 +253,7 @@ The format of the string is str(``numberOfRouteChanges``) <tab> total number of 
 number of currently observed route changes in ``traceroute``'s timeslot
 str(``numberOfRouteChanges``) refers to the string representation of a ``NumberOfRouteChangesStatistics`` instance.
 """
-def collectNumberRouteChangesFeatures(traceroute, numberOfRouteChanges):
+def __collectNumberRouteChangesFeatures(traceroute, numberOfRouteChanges):
     return str(numberOfRouteChanges) + '\t' + str(traceroute.nbRouteChangesInSlot) + '\t' \
             + ('1' if traceroute.nbRouteChangesInSlot > 0 else '0') + '\t' \
             + str(traceroute.nbRouteChangesInNextSlot) + '\t' + str(traceroute.currentNbChangesInSlot)
@@ -266,7 +266,7 @@ The format of the string is str(``minRTT``) <tab> min RTT of the last hop of ``t
 traceroute sample following ``traceroute``
 str(``minRTT``) refers to the string representation of a ``NumberOfRouteChangesStatistics`` instance.
 """
-def collectMinRTTFeatures(traceroute, minRTT):
+def __collectMinRTTFeatures(traceroute, minRTT):
     return str(minRTT) + '\t' + str(traceroute.lastHop.minRTT) + '\t' + str(traceroute.nextLastHop.minRTT)
 
 
@@ -277,26 +277,26 @@ is the time at which this function has been executed, <srcIP> the source IP of t
 destination IP of it.
 One line corresponds to the features for one traceroute sample.
 The (tab separated) format of a line is: <resLifeFeatures> <tab> <routeChangesFeatures> <tab> <minRTTFeatures>.
-These features are the results of the functions collectResidualLifetimeFeatures(), collectNumberRouteChangesFeatures(),
-and collectMinRTTFeatures().
+These features are the results of the functions __collectResidualLifetimeFeatures(), __collectNumberRouteChangesFeatures(),
+and __collectMinRTTFeatures().
 """
-def saveFeaturesToFile(traceroutes, routeDurationStats, numberRouteChangesStats, minRTTStats):
+def __saveFeaturesToFile(traceroutes, routeDurationStats, numberRouteChangesStats, minRTTStats):
     if traceroutes:
         currentTime = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S')
         srcIP = traceroutes[0].srcIP
         dstIP = traceroutes[0].dstIP
 
-        fileName = str(currentTime) + '_features_' + srcIP + '_' + dstIP + '.log'
+        fileName = '../logs/' + str(currentTime) + '_features_' + srcIP + '_' + dstIP + '.log'
 
         with open(fileName, 'w') as out:
             for traceroute in traceroutes:
-                resLifeFeatures = collectResidualLifetimeFeatures(traceroute, routeDurationStats)
-                routeChangesFeatures = collectNumberRouteChangesFeatures(traceroute, numberRouteChangesStats)
-                minRTTFeatures = collectMinRTTFeatures(traceroute, minRTTStats)
+                resLifeFeatures = __collectResidualLifetimeFeatures(traceroute, routeDurationStats)
+                routeChangesFeatures = __collectNumberRouteChangesFeatures(traceroute, numberRouteChangesStats)
+                minRTTFeatures = __collectMinRTTFeatures(traceroute, minRTTStats)
 
                 out.write(str(resLifeFeatures) + '\t' + str(routeChangesFeatures) + '\t' + str(minRTTFeatures + '\n'))
 
-        print 'Features of traceroutes for source = ' + srcIP + ', destination = ' + dstIP + 'have been dumped into a log file.'
+        print 'Features of traceroutes for source = ' + srcIP + ', destination = ' + dstIP + ' have been dumped into a log file.'
     else:
         print 'No traceroutes found...'
 
@@ -305,7 +305,7 @@ def saveFeaturesToFile(traceroutes, routeDurationStats, numberRouteChangesStats,
 TODO
 """
 def getFeatures(filename, observationDuration, timeslotDuration):
-    with open(filename, 'r') as inputFile:
+    with open('../input/' + filename, 'r') as inputFile:
         diffTraceroutes = list()  # observed traceroutes without sequential repetition; example: A A B A is stored as A B A)
         traceroutes     = list()  # all obsserved traceroutes
 
@@ -332,12 +332,13 @@ def getFeatures(filename, observationDuration, timeslotDuration):
 
                 # get timestamp for time at which this traceroute was launched
                 elif data[0] == 'TIMESTAMP:':
-                    unixTimestamp = getUnixTimestamp(data[1])
+                    unixTimestamp = __getUnixTimestamp(data[1])
 
                     if not timestampMeasurementsBegin:   # first traceroute in file
+                        timestampMeasurementsBegin = unixTimestamp
                         # prepare the different timeslots: each traceroute sample will be assigned to its corresponding
                         # timeslot so that we can compute the number of route changes in each slot later
-                        timeslots = getTimeslots(unixTimestamp, timeslotDuration, observationDuration)
+                        timeslots = __getTimeslots(unixTimestamp, timeslotDuration, observationDuration)
                         timeslotsLowerBounds = [ts[0] for ts in timeslots]  # get lower bounds of different timeslots
 
                         # initiate the list for each timeslot (the lists will later contain the traceroutes associated to
@@ -366,7 +367,7 @@ def getFeatures(filename, observationDuration, timeslotDuration):
                 # all information about one traceroute has been collected - wrap up with this one
                 elif data[0] == 'END':
                     # add this traceroute to its corresponding timeslot
-                    timeslotIndex = getTimeslotIndex(timeslotsLowerBounds, currentTraceroute.timestamp)
+                    timeslotIndex = __getTimeslotIndex(timeslotsLowerBounds, currentTraceroute.timestamp)
                     currentTraceroute.timeslotIndex = timeslotIndex
 
                     # if applicable, add this traceroute to the list of different traceroutes
@@ -415,10 +416,10 @@ def getFeatures(filename, observationDuration, timeslotDuration):
         for tracert in traceroutes:
             if currentIndexDiffTraceroutes < lengthDiffTraceroutes - 1:
                 tracert.resLifetime = float(diffTraceroutes[currentIndexDiffTraceroutes + 1].timestamp) - float(tracert.timestamp)
-            tracert.routeAge = float(tracert.timestamp) - float(diffTraceroutes[currentIndexDiffTraceroutes])
+            tracert.routeAge = float(tracert.timestamp) - float(diffTraceroutes[currentIndexDiffTraceroutes].timestamp)
 
             # does the next traceroute represent the same route as the current traceroute?
-            if currentIndexTraceroutes < lengthTraceroutes and traceroutes[currentIndexTraceroutes] != traceroutes[currentIndexTraceroutes + 1]:
+            if currentIndexTraceroutes < lengthTraceroutes - 1 and traceroutes[currentIndexTraceroutes] != traceroutes[currentIndexTraceroutes + 1]:
                 currentIndexDiffTraceroutes += 1  # move on to the next traceroute in <diffTraceroutes>
 
             if tracert.lastHop.minRTT != '-1':
@@ -437,12 +438,12 @@ def getFeatures(filename, observationDuration, timeslotDuration):
 
         # compute stats about observed route durations
         routeDurations_np = np.array(routeDurations)  # create numpy array
-        routeDurationStats = getStatistics(routeDurations_np, 'res')
+        routeDurationStats = __getStatistics(routeDurations_np, 'res')
 
         # compute stats about route changes in timeslots
         nbRouteChangesInTimeslots = [len(routes) - 1 if len(routes) > 0 else 0 for routes in routesInSlots]
         nbRouteChangesInTimeslots_np = np.array(nbRouteChangesInTimeslots)
-        nbRouteChangesStats = getStatistics(nbRouteChangesInTimeslots_np, 'rc')
+        nbRouteChangesStats = __getStatistics(nbRouteChangesInTimeslots_np, 'rc')
 
         # for the number of route changes, add also the total number of changes observed during the observation time
         nbRouteChangesStats.totalNumberOfRouteChanges = nbRouteChanges
@@ -453,7 +454,14 @@ def getFeatures(filename, observationDuration, timeslotDuration):
 
         # compute stats about observed minimum RTTs
         minRTTs_np = np.array(minRTTs)  # create numpy array
-        minRTTStats = getStatistics(minRTTs_np, 'rtt')
+        minRTTStats = __getStatistics(minRTTs_np, 'rtt')
+
+        # for each traceroute, compute the number of route changes in its timeslot, and, if applicable, the number of
+        # route changes in the next timeslot
+        for traceroute in traceroutes:
+            traceroute.nbRouteChangesInSlot = nbRouteChangesInTimeslots[traceroute.timeslotIndex]
+            if traceroute.timeslotIndex < len(nbRouteChangesInTimeslots) - 1:
+                traceroute.nbRouteChangesInNextSlot = nbRouteChangesInTimeslots[traceroute.timeslotIndex + 1]
 
         # save computed features for the traceroute samples in ``traceroutes`` to a file
-        saveFeaturesToFile(traceroutes, routeDurationStats, nbRouteChangesStats, minRTTStats)
+        __saveFeaturesToFile(traceroutes, routeDurationStats, nbRouteChangesStats, minRTTStats)

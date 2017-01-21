@@ -304,8 +304,8 @@ def __saveFeaturesToFile(traceroutes, routeDurationStats, numberRouteChangesStat
 """
 TODO
 """
-def getFeatures(filename, observationDuration, timeslotDuration):
-    with open('../input/' + filename, 'r') as inputFile:
+def getFeatures(path, filename, observationDuration, timeslotDuration):
+    with open(path + filename, 'r') as inputFile:
         diffTraceroutes = list()  # observed traceroutes without sequential repetition; example: A A B A is stored as A B A)
         traceroutes     = list()  # all obsserved traceroutes
 
@@ -317,6 +317,7 @@ def getFeatures(filename, observationDuration, timeslotDuration):
         # same traceroute-storing principle as for <difftraceroutes>
         routesInSlots = list()
 
+        print "start parsing file '" + filename + "' and extracting features..."
         for line in inputFile:
             line = line.rstrip('\r\n')
             if line:
@@ -464,4 +465,5 @@ def getFeatures(filename, observationDuration, timeslotDuration):
                 traceroute.nbRouteChangesInNextSlot = nbRouteChangesInTimeslots[traceroute.timeslotIndex + 1]
 
         # save computed features for the traceroute samples in ``traceroutes`` to a file
+        print 'Dumping features to logfile...'
         __saveFeaturesToFile(traceroutes, routeDurationStats, nbRouteChangesStats, minRTTStats)

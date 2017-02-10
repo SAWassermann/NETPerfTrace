@@ -41,7 +41,7 @@ Acknowledgement
 
 This work has been partially funded by the Vienna Science and Technology Fund (WWTF) through project ICT15-129, [“BigDAMA”](https://bigdama.ait.ac.at/).
 
-<a href="https://bigdama.ait.ac.at/"><img src="http://bigdama.ait.ac.at/wp-content/uploads/2016/06/bigdama_logo_jpg.jpg" width="200" alt="BigDAMA"/></a>
+ [![BigDAMA](docs/bigdama.png)](https://bigdama.ait.ac.at/)
 
 Authors
 -------

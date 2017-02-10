@@ -129,29 +129,29 @@ class NumberOfRouteChangesStatistics:
 
 
 """
-Class representing statistics about the observed minimum round-trip times (RTT).
+Class representing statistics about the observed average round-trip times (RTT).
 The statistics that are stored are: average, minimum, maximum, 5% -, 10% -, 25% -, 50% -, 75% -, 90% -, and 95% - percentile.
 """
-class MinRTTStatistics:
+class AvgRTTStatistics:
     """
-    Initiate an instance of MinRTTStatistics.
+    Initiate an instance of AvgRTTStatistics.
     """
     def __init__(self, avg, min, max, percentiles):
-        self.minRTTAverage = avg
-        self.minRTTMinimum = min
-        self.minRTTMaximum = max
-        self.minRTTPercentiles = percentiles
+        self.avgRTTAverage = avg
+        self.avgRTTMinimum = min
+        self.avgRTTMaximum = max
+        self.avgRTTPercentiles = percentiles
 
 
     """
-    String representation of an instance of ``MinRTTStatistics``.
+    String representation of an instance of ``AvgRTTStatistics``.
     Its format is: average <tab> minimum <tab> maximum <tab> percentiles (tab separated)
     """
     def __str__(self):
-        return str(self.minRTTAverage) + '\t' + \
-                str(self.minRTTMinimum) + '\t' + \
-                str(self.minRTTMaximum) + '\t' + \
-                '\t'.join(map(str, self.minRTTPercentiles))
+        return str(self.avgRTTAverage) + '\t' + \
+                str(self.avgRTTMinimum) + '\t' + \
+                str(self.avgRTTMaximum) + '\t' + \
+                '\t'.join(map(str, self.avgRTTPercentiles))
 
 
 """
@@ -199,7 +199,7 @@ The collected stats are returned either as a RouteDurationStatistics-, a NumberO
 MininumRTTStatistics-object.
 if metric == 'res' -> RouteDurationStatistics
 elif metric == 'rc' -> NumberOfRouteChangesStatistics
-elif metric == 'rtt' -> MininumRTTStatistics
+elif metric == 'rtt' -> AverageRTTStatistics
 else None.
 If <numpyVec> is empty, return an instance for which the fields are filled with 0's.
 """
@@ -223,14 +223,14 @@ def __getStatistics(numpyVec, metric):
         elif metric == 'rc':
             return NumberOfRouteChangesStatistics(average, minimum, maximum, percentiles)
         elif metric == 'rtt':
-            return MinRTTStatistics(average, minimum, maximum, percentiles)
+            return AvgRTTStatistics(average, minimum, maximum, percentiles)
     else:
         if metric == 'res':
             return RouteDurationStatistics(0, 0, 0, [0 for i in range(0, NUMBER_OF_PERCENTILES)])
         elif metric == 'rc':
             return NumberOfRouteChangesStatistics(0, 0, 0, [0 for i in range(0, NUMBER_OF_PERCENTILES)])
         elif metric == 'rtt':
-            return MinRTTStatistics(0, 0, 0, [0 for i in range(0, NUMBER_OF_PERCENTILES)])
+            return AvgRTTStatistics(0, 0, 0, [0 for i in range(0, NUMBER_OF_PERCENTILES)])
         else:
             return None
 
@@ -241,70 +241,151 @@ form of a string.
 The format of the string is str(``routeDuration``) <tab> route age of the route <tab> residual lifetime of the route
 str(``routeDuration``) refers to the string representation of a ``NumberOfRouteChangesStatistics`` instance.
 """
-def __collectResidualLifetimeFeatures(traceroute, routeDuration):
+def __collectStringResidualLifetimeFeatures(traceroute, routeDuration):
     return str(routeDuration) + '\t' + str(traceroute.routeAge) + '\t' + str(traceroute.resLifetime)
+
+
+# TODO
+def __collectResidualLifetimeFeatures(traceroute, routeDuration):
+    return [routeDuration.routeDurationAverage, routeDuration.routeDurationMinimum, routeDuration.routeDurationMaximum] +\
+           list(routeDuration.routeDurationPercentiles) + \
+           [traceroute.routeAge, traceroute.resLifetime]
 
 
 """
 Get all the features for the traceroute sample ``traceroute`` required for predicting the number of route changes in the next
 timeslot in the form of a string.
 The format of the string is str(``numberOfRouteChanges``) <tab> total number of route changes in this timeslot <tab>
-1 if there are route changes in this slot, 0 otherwise <tab> number of route changes in the next timeslot <tab>
-number of currently observed route changes in ``traceroute``'s timeslot
+1 if there are route changes in this slot, 0 otherwise <tab> number of currently observed route changes in ``traceroute``'s timeslot
+<tab> number of route changes in the next timeslot
 str(``numberOfRouteChanges``) refers to the string representation of a ``NumberOfRouteChangesStatistics`` instance.
 """
-def __collectNumberRouteChangesFeatures(traceroute, numberOfRouteChanges):
+def __collectStringNumberRouteChangesFeatures(traceroute, numberOfRouteChanges):
     return str(numberOfRouteChanges) + '\t' + str(traceroute.nbRouteChangesInSlot) + '\t' \
             + ('1' if traceroute.nbRouteChangesInSlot > 0 else '0') + '\t' \
-            + str(traceroute.nbRouteChangesInNextSlot) + '\t' + str(traceroute.currentNbChangesInSlot)
+            + str(traceroute.currentNbChangesInSlot) + '\t' + str(traceroute.nbRouteChangesInNextSlot)
+
+
+# TODO
+def __collectNumberRouteChangesFeatures(traceroute, numberOfRouteChanges):
+    return [numberOfRouteChanges.totalNumberOfRouteChanges, numberOfRouteChanges.numberOfRouteChangesInTimeslotsAverage,
+            numberOfRouteChanges.numberOfRouteChangesInTimeslotsMinimum, numberOfRouteChanges.numberOfRouteChangesInTimeslotsMaximum] \
+            + list(numberOfRouteChanges.numberOfRouteChangesInTimeslotsPercentiles) + \
+           [traceroute.nbRouteChangesInSlot, 1 if traceroute.nbRouteChangesInSlot > 0 else 0,
+            traceroute.currentNbChangesInSlot, traceroute.nbRouteChangesInNextSlot]
 
 
 """
-Get all the features for the traceroute sample ``traceroute`` required for predicting the minimum RTT of the next traceroute
+Get all the features for the traceroute sample ``traceroute`` required for predicting the average RTT of the next traceroute
 sample in the form of a string.
-The format of the string is str(``minRTT``) <tab> min RTT of the last hop of ``traceroute`` <tab> min RTT of the last hop of the
+The format of the string is str(``avgRTT``) <tab> avg RTT of the last hop of ``traceroute`` <tab> avg RTT of the last hop of the
 traceroute sample following ``traceroute``
-str(``minRTT``) refers to the string representation of a ``NumberOfRouteChangesStatistics`` instance.
+str(``avgRTT``) refers to the string representation of a ``AvgRTTStatistics`` instance.
 """
-def __collectMinRTTFeatures(traceroute, minRTT):
-    return str(minRTT) + '\t' + str(traceroute.lastHop.minRTT) + '\t' + str(traceroute.nextLastHop.minRTT)
+def __collectStringAvgRTTFeatures(traceroute, avgRTT):
+    return str(avgRTT) + '\t' + str(traceroute.lastHop.avgRTT) + '\t' + str(traceroute.nextLastHop.avgRTT)
+
+
+# TODO
+def __collectAvgRTTFeatures(traceroute, avgRTT):
+    return [avgRTT.avgRTTAverage, avgRTT.avgRTTMinimum, avgRTT.avgRTTMaximum] + list(avgRTT.avgRTTPercentiles) +\
+           [traceroute.lastHop.avgRTT, traceroute.nextLastHop.avgRTT]
+
+
+# TODO
+def __collectAllFeatures(traceroutes, routeDurationStats, numberRouteChangesStats, avgRTTStats, inTraining):
+    resLifeInputFeatures = list()
+    routeChangesInputFeatures = list()
+    avgRTTInputFeatures = list()
+
+    if inTraining:
+        resLifeRealValues = list()
+        routeChangesRealValues = list()
+        avgRTTRealValues = list()
+
+    invalidValues = [None, -1]
+
+    for traceroute in traceroutes:
+        # retrieve all the features of this traceroute and keep if valid
+        resLifeFeatures = __collectResidualLifetimeFeatures(traceroute, routeDurationStats)
+        if (inTraining and any(i in resLifeFeatures for i in invalidValues)) or \
+            (not inTraining and any(i in resLifeFeatures[:-1] for i in invalidValues)):
+            continue
+
+        routeChangesFeatures = __collectNumberRouteChangesFeatures(traceroute, numberRouteChangesStats)
+        if (inTraining and any(i in routeChangesFeatures for i in invalidValues)) or \
+            (not inTraining and any(i in routeChangesFeatures[:-1] for i in invalidValues)):
+            continue
+
+        avgRTTfeatures = __collectAvgRTTFeatures(traceroute, avgRTTStats)
+        if (inTraining and any(i in avgRTTfeatures for i in invalidValues)) or \
+                (not inTraining and any(i in avgRTTfeatures[:-1] for i in invalidValues)):
+            continue
+
+        resLifeInputFeatures.append(resLifeFeatures[:-1])
+        routeChangesInputFeatures.append(routeChangesFeatures[:-1])
+        avgRTTInputFeatures.append(avgRTTfeatures[:-1])
+
+        if inTraining:
+            resLifeRealValues.append(resLifeFeatures[-1])
+            routeChangesRealValues.append(routeChangesFeatures[-1])
+            avgRTTRealValues.append(avgRTTInputFeatures[-1])
+
+    if inTraining:
+        return resLifeInputFeatures, routeChangesInputFeatures, avgRTTInputFeatures, resLifeRealValues, \
+               routeChangesRealValues, avgRTTRealValues
+    else:
+        return resLifeInputFeatures, routeChangesInputFeatures, avgRTTInputFeatures
 
 
 """
+<TO CHANGE>
 Dump features required for the predictions for traceroutes in the array ``traceroutes`` into a log file. This file will
 be located in the log folder and the naming scheme of it is: '<timestamp>_features_<srcIP>_<dstIP>.log', where <timestamp>
 is the time at which this function has been executed, <srcIP> the source IP of the monitored path, and <dstIP> the
 destination IP of it.
 One line corresponds to the features for one traceroute sample.
 The (tab separated) format of a line is: <resLifeFeatures> <tab> <routeChangesFeatures> <tab> <minRTTFeatures>.
-These features are the results of the functions __collectResidualLifetimeFeatures(), __collectNumberRouteChangesFeatures(),
-and __collectMinRTTFeatures().
+These features are the results of the functions __collectStringResidualLifetimeFeatures(), __collectStringNumberRouteChangesFeatures(),
+and __collectStringAvgRTTFeatures().
 """
-def __saveFeaturesToFile(traceroutes, routeDurationStats, numberRouteChangesStats, minRTTStats):
+def __saveFeaturesInFile(traceroutes, routeDurationStats, numberRouteChangesStats, avgRTTStats):
     if traceroutes:
         currentTime = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S')
         srcIP = traceroutes[0].srcIP
         dstIP = traceroutes[0].dstIP
 
+        invalidValues = [None, -1]
+
         fileName = '../logs/' + str(currentTime) + '_features_' + srcIP + '_' + dstIP + '.log'
 
         with open(fileName, 'w') as out:
             for traceroute in traceroutes:
+                # retrieve all the features of this traceroute and check if valid
                 resLifeFeatures = __collectResidualLifetimeFeatures(traceroute, routeDurationStats)
+                if any(i in resLifeFeatures for i in invalidValues):
+                    continue
                 routeChangesFeatures = __collectNumberRouteChangesFeatures(traceroute, numberRouteChangesStats)
-                minRTTFeatures = __collectMinRTTFeatures(traceroute, minRTTStats)
+                if any(i in routeChangesFeatures for i in invalidValues):
+                    continue
+                avgRTTfeatures = __collectAvgRTTFeatures(traceroute, avgRTTStats)
+                if any(i in avgRTTfeatures for i in invalidValues):
+                    continue
 
-                out.write(str(resLifeFeatures) + '\t' + str(routeChangesFeatures) + '\t' + str(minRTTFeatures + '\n'))
+                # save to log file
+                resLifeFeaturesString = __collectStringResidualLifetimeFeatures(traceroute, routeDurationStats)
+                routeChangesFeaturesString = __collectStringNumberRouteChangesFeatures(traceroute, numberRouteChangesStats)
+                minRTTFeaturesString = __collectStringAvgRTTFeatures(traceroute, avgRTTStats)
+
+                out.write(str(resLifeFeaturesString) + '\t' + str(routeChangesFeaturesString) + '\t' + str(minRTTFeaturesString + '\n'))
 
         print 'Features of traceroutes for source = ' + srcIP + ', destination = ' + dstIP + ' have been dumped into a log file.'
     else:
         print 'No traceroutes found...'
 
 
-"""
-TODO
-"""
-def getFeatures(path, filename, observationDuration, timeslotDuration):
+# TODO
+def getFeatures(path, filename, observationDuration, timeslotDuration, inTraining):
     with open(path + filename, 'r') as inputFile:
         diffTraceroutes = list()  # observed traceroutes without sequential repetition; example: A A B A is stored as A B A)
         traceroutes     = list()  # all obsserved traceroutes
@@ -317,7 +398,7 @@ def getFeatures(path, filename, observationDuration, timeslotDuration):
         # same traceroute-storing principle as for <difftraceroutes>
         routesInSlots = list()
 
-        print "start parsing file '" + filename + "' and extracting features..."
+        print "Start parsing file '" + filename + "' and extracting features..."
         for line in inputFile:
             line = line.rstrip('\r\n')
             if line:
@@ -353,16 +434,16 @@ def getFeatures(path, filename, observationDuration, timeslotDuration):
                 elif data[0] == 'HOP:':
                     hop = TracerouteHop()
                     hop.IP = data[1]
-                    hop.minRTT = data[2]
-                    hop.avgRTT = data[3]
-                    hop.maxRTT = data[4]
-                    hop.mdevRTT = data[5]
+                    hop.minRTT = float(data[2])
+                    hop.avgRTT = float(data[3])
+                    hop.maxRTT = float(data[4])
+                    hop.mdevRTT = float(data[5])
 
                     currentTraceroute.hops.append(hop)
 
                     # if we obtained a responde (i.e. we have the corresponding IP and the minimum RTT), consider this
                     # hop as the last traceroute hop
-                    if hop.minRTT != '-1' and hop.IP != 'NA':
+                    if hop.minRTT != -1 and hop.IP != 'NA':
                         currentTraceroute.lastHop = hop
 
                 # all information about one traceroute has been collected - wrap up with this one
@@ -423,17 +504,17 @@ def getFeatures(path, filename, observationDuration, timeslotDuration):
             if currentIndexTraceroutes < lengthTraceroutes - 1 and traceroutes[currentIndexTraceroutes] != traceroutes[currentIndexTraceroutes + 1]:
                 currentIndexDiffTraceroutes += 1  # move on to the next traceroute in <diffTraceroutes>
 
-            if tracert.lastHop.minRTT != '-1':
-                minRTTs.append(float(tracert.lastHop.minRTT))
-                avgRTTs.append(float(tracert.lastHop.avgRTT))
-                maxRTTs.append(float(tracert.lastHop.maxRTT))
-                mdevRTTs.append(float(tracert.lastHop.mdevRTT))
+            if tracert.lastHop.minRTT != -1:
+                minRTTs.append(tracert.lastHop.minRTT)
+                avgRTTs.append(tracert.lastHop.avgRTT)
+                maxRTTs.append(tracert.lastHop.maxRTT)
+                mdevRTTs.append(tracert.lastHop.mdevRTT)
 
             # save the hop of the next traceroute sample to the current traceroute will be used for feature computation later)
             if currentIndexTraceroutes < lengthTraceroutes - 1:
                 tracert.nextLastHop = traceroutes[currentIndexTraceroutes + 1].lastHop
             else:
-                tracert.nextLastHop = tracert.lastHop
+                tracert.nextLastHop = TracerouteHop()
 
             currentIndexTraceroutes += 1
 
@@ -449,13 +530,13 @@ def getFeatures(path, filename, observationDuration, timeslotDuration):
         # for the number of route changes, add also the total number of changes observed during the observation time
         nbRouteChangesStats.totalNumberOfRouteChanges = nbRouteChanges
 
-        # compute stats about observed average RTTs
-        # avgRTTs_np = np.array(avgRTTs)  # create numpy array
-        # avgRTTVector = getStatisticsVector(avgRTTs_np)
-
         # compute stats about observed minimum RTTs
-        minRTTs_np = np.array(minRTTs)  # create numpy array
-        minRTTStats = __getStatistics(minRTTs_np, 'rtt')
+        # minRTTs_np = np.array(minRTTs)  # create numpy array
+        # minRTTStats = __getStatistics(minRTTs_np, 'rtt')
+
+        # compute stats about observed average RTTs
+        avgRTTs_np = np.array(avgRTTs)  # create numpy array
+        avgRTTStats = __getStatistics(avgRTTs_np, 'rtt')
 
         # for each traceroute, compute the number of route changes in its timeslot, and, if applicable, the number of
         # route changes in the next timeslot
@@ -464,6 +545,13 @@ def getFeatures(path, filename, observationDuration, timeslotDuration):
             if traceroute.timeslotIndex < len(nbRouteChangesInTimeslots) - 1:
                 traceroute.nbRouteChangesInNextSlot = nbRouteChangesInTimeslots[traceroute.timeslotIndex + 1]
 
-        # save computed features for the traceroute samples in ``traceroutes`` to a file
-        print 'Dumping features to logfile...'
-        __saveFeaturesToFile(traceroutes, routeDurationStats, nbRouteChangesStats, minRTTStats)
+        if inTraining:
+            # save computed features for the traceroute samples in ``traceroutes`` to a file
+            print 'Dumping features of observation paths to logfiles...'
+            __saveFeaturesInFile(traceroutes, routeDurationStats, nbRouteChangesStats, avgRTTStats)
+            return __collectAllFeatures(traceroutes, routeDurationStats, nbRouteChangesStats, avgRTTStats, True)
+        else:
+            # for the prediction, we only need the features of the traceroute we want to forecast, i.e. the last one
+            # of the path
+            return __collectAllFeatures([traceroutes[-1]], routeDurationStats, nbRouteChangesStats, avgRTTStats, False) \
+                    + (traceroutes[-1].srcIP, traceroutes[-1].dstIP)

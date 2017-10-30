@@ -10,7 +10,8 @@ More precisely, NETPerfTrace aims at predicting 3 metrics:
 
 The current implementation of NETPerfTrace relies on a random forest with 10 trees for the prediction tasks.
 
-###How to use NETPerfTrace
+### How to use NETPerfTrace
+
 NETPerfTrace has been implemented using Python 2.7. For the machine-learning part, this tool is based on [scikit-learn](http://scikit-learn.org/stable/). 
 To install scikit-learn, please follow [the instructions on the official website](http://scikit-learn.org/stable/install.html). 
 

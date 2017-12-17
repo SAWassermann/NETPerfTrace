@@ -40,7 +40,7 @@ if __name__ == '__main__':
     observationPathsList = os.listdir(INIT_PATH_OBSERVATION)
 
     for observationPath in observationPathsList:
-        if observationPath in ['.gitignore', '.gitkeep']:
+        if observationPath in ['.gitignore', 'gitkeep']:
             continue
         f = fe.getFeatures(INIT_PATH_OBSERVATION, observationPath, arguments['observationTime'], arguments['timeslotDuration'], True)
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     predictionPathsList = os.listdir(INIT_PATH_PREDICTION)
 
     for predictionPath in predictionPathsList:
-        if predictionPath in ['.gitignore', '.gitkeep']:
+        if predictionPath in ['.gitignore', 'gitkeep']:
             continue
         f = fe.getFeatures(INIT_PATH_PREDICTION, predictionPath, arguments['observationTime'],
                            arguments['timeslotDuration'], False)

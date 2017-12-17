@@ -306,7 +306,7 @@ def __collectAllFeatures(traceroutes, routeDurationStats, numberRouteChangesStat
     invalidValues = [None, -1]
 
     for traceroute in traceroutes:
-        # retrieve all the features of this traceroute and keep if valid
+        # retrieve all the features (including real value of metrics) of this traceroute and keep if valid
         resLifeFeatures = __collectResidualLifetimeFeatures(traceroute, routeDurationStats)
         if (inTraining and any(i in resLifeFeatures for i in invalidValues)) or \
             (not inTraining and any(i in resLifeFeatures[:-1] for i in invalidValues)):
@@ -317,19 +317,20 @@ def __collectAllFeatures(traceroutes, routeDurationStats, numberRouteChangesStat
             (not inTraining and any(i in routeChangesFeatures[:-1] for i in invalidValues)):
             continue
 
-        avgRTTfeatures = __collectAvgRTTFeatures(traceroute, avgRTTStats)
-        if (inTraining and any(i in avgRTTfeatures for i in invalidValues)) or \
-                (not inTraining and any(i in avgRTTfeatures[:-1] for i in invalidValues)):
+        avgRTTFeatures = __collectAvgRTTFeatures(traceroute, avgRTTStats)
+        if (inTraining and any(i in avgRTTFeatures for i in invalidValues)) or \
+                (not inTraining and any(i in avgRTTFeatures[:-1] for i in invalidValues)):
             continue
 
+        # get features fed into the ML model
         resLifeInputFeatures.append(resLifeFeatures[:-1])
         routeChangesInputFeatures.append(routeChangesFeatures[:-1])
-        avgRTTInputFeatures.append(avgRTTfeatures[:-1])
+        avgRTTInputFeatures.append(avgRTTFeatures[:-1])
 
         if inTraining:
             resLifeRealValues.append(resLifeFeatures[-1])
             routeChangesRealValues.append(routeChangesFeatures[-1])
-            avgRTTRealValues.append(avgRTTInputFeatures[-1])
+            avgRTTRealValues.append(avgRTTFeatures[-1])
 
     if inTraining:
         return resLifeInputFeatures, routeChangesInputFeatures, avgRTTInputFeatures, resLifeRealValues, \
